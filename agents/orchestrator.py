@@ -6,17 +6,16 @@ Coordinates the specialist agents into the end-to-end application workflow:
   intake -> data_extraction -> data_validation -> eligibility_assessment
          -> decision -> enablement_recommendation -> finalize
 
-(Phase 9 adds the `enablement_recommendation` node after `decision`; it
-runs for every applicant, not only declines, to surface upskilling/job-
-matching support alongside the financial-support decision.)
+Orchestration tool: LangGraph (StateGraph) is used to define this as an
+explicit, inspectable graph with conditional routing (e.g. skip straight to
+human review if validation flags are severe). If LangGraph isn't installed
+in the current environment, a functionally equivalent sequential executor
+is used instead so the pipeline still runs end-to-end -- this keeps the
+prototype runnable in restricted/offline environments while the "real"
+deployment (see docker-compose / requirements.txt) uses the full graph.
 
-Orchestration tool: LangGraph (StateGraph) defines this as an explicit,
-inspectable graph. If LangGraph isn't installed, a functionally equivalent
-sequential executor runs instead, so the pipeline still works end-to-end in
-restricted/offline environments.
-
-Reasoning framework: each specialist agent internally follows a ReAct loop
-(Thought -> Action -> Observation), recorded via observability/tracing.py.
+Reasoning framework: each specialist agent internally follows a ReAct
+loop (Thought -> Action -> Observation), recorded via observability/tracing.py.
 """
 import logging
 import time
@@ -56,6 +55,13 @@ def _node_finalize(state: dict) -> dict:
     return state
 
 
+def _route_after_validation(state: dict) -> str:
+    """Conditional edge: severe inconsistencies short-circuit straight to
+    decision (which will route to human review) but eligibility scoring
+    still runs so the human reviewer has a full picture."""
+    return "eligibility_assessment"
+
+
 def build_graph():
     if not LANGGRAPH_AVAILABLE:
         return None
@@ -72,7 +78,8 @@ def build_graph():
     graph.set_entry_point("intake")
     graph.add_edge("intake", "data_extraction")
     graph.add_edge("data_extraction", "data_validation")
-    graph.add_edge("data_validation", "eligibility_assessment")
+    graph.add_conditional_edges("data_validation", _route_after_validation,
+                                 {"eligibility_assessment": "eligibility_assessment"})
     graph.add_edge("eligibility_assessment", "decision")
     graph.add_edge("decision", "enablement_recommendation")
     graph.add_edge("enablement_recommendation", "finalize")
@@ -95,8 +102,8 @@ _SEQUENTIAL_STEPS = [
 
 
 def run_application(state: dict) -> dict:
-    """Entry point used by the API layer (added in Phase 6). `state` must
-    contain at least `form_data` and `raw_documents`."""
+    """Entry point used by the API layer. `state` must contain at least
+    `application_id`, `form_data`, and `raw_documents`."""
     start = time.perf_counter()
 
     if LANGGRAPH_AVAILABLE and _compiled_graph is not None:

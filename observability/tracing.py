@@ -1,15 +1,12 @@
 """
-Unified tracing helper.
-
-Phase 1:  appended steps to an in-memory `state['trace']` list only.
-Phase 7:  also persists each step to the `agent_traces` table once a
-          database session + application_id are present in `state`.
-Phase 10: also mirrors each step to Langfuse when LANGFUSE_PUBLIC_KEY /
-          LANGFUSE_SECRET_KEY are configured, giving end-to-end latency,
-          cost, and prompt/response observability across the whole
-          pipeline. All three sinks are independent and best-effort --
-          agents never need to change because they only ever call
-          `trace_step(...)`.
+Unified tracing helper. Every agent step is:
+  1. appended to state['trace'] (in-memory, always available, drives the
+     Streamlit "agent reasoning" panel in real time), and
+  2. forwarded to Langfuse when LANGFUSE_PUBLIC_KEY/SECRET_KEY are set
+     (end-to-end observability: latency, cost, prompt/response pairs,
+     per-agent spans), and
+  3. persisted to the local AgentTrace table for durable audit history
+     (case officers can review *why* a decision was made after the fact).
 """
 import logging
 
@@ -31,11 +28,9 @@ if settings.LANGFUSE_PUBLIC_KEY and settings.LANGFUSE_SECRET_KEY:
 
 
 def trace_step(state: dict, agent_name: str, step_type: str, content: str):
-    """Record one ReAct step (thought | action | observation) for an agent."""
     state.setdefault("trace", []).append({
         "agent": agent_name, "type": step_type, "content": content,
     })
-    logger.debug("[%s] %s: %s", agent_name, step_type, content)
 
     if _langfuse_client is not None:
         try:

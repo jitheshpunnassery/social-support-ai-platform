@@ -1,10 +1,8 @@
 """
-Base class for all agents. Implements a ReAct-style loop contract: each
-agent records THOUGHT -> ACTION -> OBSERVATION steps into a shared trace
-list via observability/tracing.py. Every specialist agent added in later
-phases (Data Extraction in Phase 2, Data Validation in Phase 3, Eligibility
-in Phase 4, Decision in Phase 5, Enablement in Phase 9) inherits from this
-class so the reasoning trace format is consistent across the whole system.
+Base class for all agents. Implements a ReAct-style loop contract:
+each agent records THOUGHT -> ACTION -> OBSERVATION steps into a shared
+trace list (mirrored to Langfuse when configured, and to the local
+AgentTrace table for auditability without external dependencies).
 """
 import logging
 import time

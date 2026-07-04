@@ -1,42 +1,42 @@
-# === Phase 1: Initial project structure ===
-python-dotenv==1.0.1
-pandas==2.2.3
-numpy==1.26.4
-
-# === Phase 2: OCR / multimodal document extraction ===
-pdfplumber==0.11.4
-pytesseract==0.3.13
-Pillow==10.4.0
-openpyxl==3.1.5
-python-docx==1.1.2
-
-# === Phase 4: ML eligibility model ===
-scikit-learn==1.5.2
-joblib==1.4.2
-
-# === Phase 5: LangGraph agent orchestration ===
-langgraph==0.2.34
-langchain-core==0.3.9
-
-# === Phase 6: FastAPI backend + Streamlit frontend ===
+# --- Core ---
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 pydantic==2.9.2
+python-dotenv==1.0.1
 python-multipart==0.0.9
-streamlit==1.38.0
-requests==2.32.3
-httpx==0.27.2
 
-# === Phase 7: PostgreSQL + MongoDB persistence ===
+# --- Data layer ---
 sqlalchemy==2.0.35
-psycopg2-binary==2.9.9
-pymongo==4.9.1
+psycopg2-binary==2.9.9      # PostgreSQL driver (falls back to sqlite if PG unavailable)
+pymongo==4.9.1               # MongoDB (document store for raw extracted files)
+qdrant-client==1.11.3        # Vector DB (semantic search over policy docs / precedent cases)
+neo4j==5.24.0                # Graph DB (applicant <-> family <-> document relationship graph)
 
-# === Phase 8: Local LLM (Ollama) + Qdrant RAG ===
-openai==1.51.0
-qdrant-client==1.11.3
+# --- ML / Data processing ---
+scikit-learn==1.5.2
+pandas==2.2.3
+numpy==1.26.4
+joblib==1.4.2
+openpyxl==3.1.5              # assets/liabilities Excel ingestion
 
-# === Phase 10: Neo4j graph store + Langfuse observability + testing ===
-neo4j==5.24.0
+# --- Document / OCR / multimodal extraction ---
+pdfplumber==0.11.4
+pytesseract==0.3.13
+Pillow==10.4.0
+
+# --- GenAI / Agents ---
+langgraph==0.2.34            # agent orchestration (graph-based ReAct workflow)
+langchain-core==0.3.9
+openai==1.51.0                # OpenAI-compatible client -> points at local Ollama server
+
+# --- Observability ---
 langfuse==2.51.3
+
+# --- Frontend ---
+streamlit==1.38.0
+plotly==5.24.1
+requests==2.32.3
+
+# --- Testing ---
 pytest==8.3.3
+httpx==0.27.2

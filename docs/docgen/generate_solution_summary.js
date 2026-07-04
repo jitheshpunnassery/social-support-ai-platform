@@ -145,6 +145,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then((buffer) => {
-  fs.writeFileSync("/home/claude/ssai-phased/docs/Solution_Summary.docx", buffer);
+  fs.writeFileSync("/home/claude/social-support-ai/docs/Solution_Summary.docx", buffer);
   console.log("Solution_Summary.docx written");
 });

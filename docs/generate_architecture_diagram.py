@@ -97,5 +97,5 @@ box(20, 6, 90, 9, "Multimodal Ingestion: application form • bank statement (PD
 arrow(65, 22, 65, 15, color="#444441", lw=1.4)
 
 plt.tight_layout()
-plt.savefig("/home/claude/ssai-phased/docs/architecture_diagram.png", dpi=200, bbox_inches="tight")
+plt.savefig("/home/claude/social-support-ai/docs/architecture_diagram.png", dpi=200, bbox_inches="tight")
 print("saved")

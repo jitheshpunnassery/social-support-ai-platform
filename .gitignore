@@ -7,9 +7,9 @@ local.db
 *.log
 .env
 data/synthetic/
+!data/synthetic/.gitkeep
 ml/eligibility_model.pkl
 docs/docgen/node_modules/
 docs/docgen/package-lock.json
 *.pdf
 page-*.jpg
-.pytest_cache/

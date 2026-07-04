@@ -64,5 +64,5 @@ ax.text(65, 34, "High-severity data-validation flags\nalways force human review,
         fontsize=8, style="italic", color="#712B13")
 
 plt.tight_layout()
-plt.savefig("/home/claude/ssai-phased/docs/workflow_diagram.png", dpi=200, bbox_inches="tight")
+plt.savefig("/home/claude/social-support-ai/docs/workflow_diagram.png", dpi=200, bbox_inches="tight")
 print("saved")

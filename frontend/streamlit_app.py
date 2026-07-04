@@ -15,14 +15,21 @@ st.caption("Prototype: multi-agent GenAI workflow for social support application
 
 tab_apply, tab_status, tab_chat = st.tabs(["📝 New Application", "📋 Check Status", "💬 Chat with the Assistant"])
 
+# ---------------------------------------------------------------- APPLY ----
 with tab_apply:
     st.subheader("Submit a new application")
+    st.write("Fill in your details and attach your supporting documents. "
+             "Our AI agents will review everything and, in most cases, give you a decision within minutes.")
+
     col1, col2 = st.columns(2)
     with col1:
         full_name = st.text_input("Full name")
         emirates_id = st.text_input("Emirates ID number", placeholder="784-YYYY-XXXXXXX-X")
-        address = st.text_input("Current address")
+        date_of_birth = st.date_input("Date of birth", value=None)
+        nationality = st.text_input("Nationality", value="UAE")
+        phone = st.text_input("Phone number")
     with col2:
+        address = st.text_input("Current address")
         family_size = st.number_input("Family size", min_value=1, max_value=20, value=1)
         employment_status = st.selectbox("Employment status",
                                           ["unemployed", "part_time", "full_time", "self_employed", "retired"])
@@ -32,17 +39,13 @@ with tab_apply:
     st.markdown("**Supporting documents**")
     d1, d2, d3 = st.columns(3)
     with d1:
-        bank_statement = st.file_uploader("Bank statement (.pdf/.doc/.docx/.txt)",
-                                            type=["pdf", "doc", "docx", "txt"])
-        emirates_id_doc = st.file_uploader("Emirates ID (.pdf/.doc/.docx/.json)",
-                                             type=["pdf", "doc", "docx", "json"])
+        bank_statement = st.file_uploader("Bank statement (.txt/.pdf)", type=["txt", "pdf"])
+        emirates_id_doc = st.file_uploader("Emirates ID (.json/.jpg/.png)", type=["json", "jpg", "png"])
     with d2:
-        resume = st.file_uploader("Resume (.pdf/.doc/.docx/.txt)",
-                                    type=["pdf", "doc", "docx", "txt"])
+        resume = st.file_uploader("Resume (.txt/.pdf)", type=["txt", "pdf"])
         assets_liabilities = st.file_uploader("Assets/liabilities (.xlsx)", type=["xlsx"])
     with d3:
-        credit_report = st.file_uploader("Credit report (.pdf/.doc/.docx/.txt)",
-                                           type=["pdf", "doc", "docx", "txt"])
+        credit_report = st.file_uploader("Credit report (.txt/.pdf)", type=["txt", "pdf"])
 
     if st.button("Submit application", type="primary"):
         if not full_name or not emirates_id:
@@ -56,23 +59,27 @@ with tab_apply:
                     files[key] = (f.name, f.getvalue())
 
             data = {
-                "full_name": full_name, "emirates_id": emirates_id, "address": address,
+                "full_name": full_name, "emirates_id": emirates_id,
+                "date_of_birth": str(date_of_birth) if date_of_birth else "",
+                "nationality": nationality, "phone": phone, "address": address,
                 "family_size": family_size, "employment_status": employment_status,
                 "monthly_income": monthly_income, "months_employed": months_employed,
             }
-            with st.spinner("Our AI agents are reviewing your application..."):
+            with st.spinner("Our AI agents are reviewing your application (extraction → validation → "
+                             "eligibility → decision → enablement)..."):
                 try:
                     resp = requests.post(f"{API}/applications", data=data, files=files, timeout=120)
                     resp.raise_for_status()
                     result = resp.json()
+                    st.session_state["last_result"] = result
                 except Exception as e:  # noqa: BLE001
                     st.error(f"Submission failed: {e}. Is the API running at {API}?")
                     result = None
 
             if result:
-                st.success(f"Application ID: `{result['application_id']}`")
+                st.success(f"Application ID: `{result['application_id']}`  —  save this to check your status later.")
                 decision = result.get("decision")
-                badge = {"approved": "✅ Approved", "soft_declined": "⚠️ Soft-declined",
+                badge = {"approved": "✅ Approved", "soft_declined": "⚠️ Soft-declined for direct support",
                          "needs_human_review": "🕵️ Routed to human case officer"}.get(decision, decision)
                 st.metric("Decision", badge)
                 if result.get("ml_score") is not None:
@@ -91,10 +98,13 @@ with tab_apply:
                         for flag in result["validation_report"]["flags"]:
                             st.write(f"**{flag['field']}** ({flag['severity']}): {flag['detail']}")
 
-                with st.expander("🔍 Agent reasoning trace"):
+                with st.expander("🔍 Agent reasoning trace (Thought → Action → Observation)"):
                     for step in result.get("trace", []):
                         st.text(f"[{step['agent']}] {step['type'].upper()}: {step['content']}")
 
+                st.caption(f"Processed in {result.get('processing_seconds')}s")
+
+# --------------------------------------------------------------- STATUS ----
 with tab_status:
     st.subheader("Check an existing application")
     app_id_lookup = st.text_input("Application ID")
@@ -108,11 +118,11 @@ with tab_status:
         except Exception as e:  # noqa: BLE001
             st.error(f"Lookup failed: {e}")
 
+# ----------------------------------------------------------------- CHAT ----
 with tab_chat:
     st.subheader("Ask the assistant")
     st.caption("Ask about eligibility criteria, required documents, or the status of a specific "
-               "application (paste the Application ID for personalized context). Powered by a "
-               "locally hosted LLM via Ollama.")
+               "application (paste the Application ID for personalized context).")
 
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []

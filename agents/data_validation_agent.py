@@ -2,15 +2,13 @@
 Data Validation Agent
 ----------------------
 Cross-checks extracted fields across documents and against the applicant's
-self-reported form data to surface inconsistencies automatically: address
-mismatches (form vs credit bureau), income variance across documents,
-name mismatches, expired IDs, etc.
+self-reported form data to surface the "Inconsistent Information" pain
+point automatically: address mismatches (form vs credit bureau), income
+variance across documents, family member/name mismatches, expired IDs, etc.
 
 Uses a ReAct loop: for each consistency rule, THOUGHT -> ACTION (comparison)
--> OBSERVATION (flag or pass). The plain-language summary in this phase is
-template-based; Phase 8 upgrades it to use the local LLM for a more natural
-case-officer-facing summary, falling back to this template when the LLM is
-unreachable.
+-> OBSERVATION (flag or pass), then asks the local LLM to summarize findings
+in plain language for the case officer / applicant-facing chat.
 """
 import difflib
 
@@ -42,26 +40,19 @@ class DataValidationAgent(BaseAgent):
         report = {"flags": flags, "overall_severity": severity, "requires_human_review": severity == "high"}
 
         if flags:
-            llm_summary = llm_client.chat(
+            summary = llm_client.chat(
                 "You are a compliance assistant. Summarize data-consistency findings for a case "
                 "officer in 2-3 plain sentences, non-accusatory tone.",
                 f"Findings: {flags}",
             )
-            report["summary"] = llm_summary or self._template_summary(flags)
+            report["summary"] = summary
         else:
-            report["summary"] = self._template_summary(flags)
+            report["summary"] = "No material inconsistencies found across submitted documents."
 
         state["validation_report"] = report
         self.think(state, f"Validation complete. Overall severity: {severity}. "
                            f"{len(flags)} flag(s) raised.")
         return state
-
-    @staticmethod
-    def _template_summary(flags: list) -> str:
-        if not flags:
-            return "No material inconsistencies found across submitted documents."
-        fields = ", ".join(f["field"] for f in flags)
-        return f"{len(flags)} consistency flag(s) raised on: {fields}. See details for specifics."
 
     def _check_name(self, form, extracted) -> list:
         flags = []

@@ -1,14 +1,18 @@
-from typing import Optional
-from pydantic import BaseModel
+from typing import Optional, Any
+from pydantic import BaseModel, Field
 
 
-class ChatMessageIn(BaseModel):
-    application_id: Optional[str] = None
-    message: str
-
-
-class ChatMessageOut(BaseModel):
-    reply: str
+class ApplicationFormIn(BaseModel):
+    full_name: str
+    emirates_id: str
+    date_of_birth: Optional[str] = None
+    nationality: Optional[str] = "UAE"
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    family_size: int = 1
+    employment_status: str = "unemployed"
+    monthly_income: float = 0.0
+    months_employed: int = 0
 
 
 class ApplicationResult(BaseModel):
@@ -19,7 +23,16 @@ class ApplicationResult(BaseModel):
     ml_score: Optional[float] = None
     top_factors: Optional[list] = None
     validation_report: Optional[dict] = None
-    enablement_recommendations: Optional[list] = None  # Phase 9
-    enablement_narrative: Optional[str] = None           # Phase 9
+    enablement_recommendations: Optional[list] = None
+    enablement_narrative: Optional[str] = None
     processing_seconds: Optional[float] = None
     trace: Optional[list] = None
+
+
+class ChatMessageIn(BaseModel):
+    application_id: Optional[str] = None
+    message: str
+
+
+class ChatMessageOut(BaseModel):
+    reply: str
