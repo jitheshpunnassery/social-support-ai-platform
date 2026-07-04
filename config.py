@@ -21,6 +21,7 @@ class Settings:
     AUTO_DECLINE_THRESHOLD = float(_get("AUTO_DECLINE_THRESHOLD", "0.35"))
 
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    MODEL_PATH = os.path.join(BASE_DIR, "ml", "eligibility_model.pkl")  # Phase 4
 
 
 settings = Settings()
