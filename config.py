@@ -52,5 +52,14 @@ class Settings:
     QDRANT_PORT = int(_get("QDRANT_PORT", "6333"))
     QDRANT_COLLECTION = _get("QDRANT_COLLECTION", "policy_precedents")
 
+    # --- Phase 10: Neo4j graph store + Langfuse observability ---
+    NEO4J_URI = _get("NEO4J_URI", "bolt://localhost:7687")
+    NEO4J_USER = _get("NEO4J_USER", "neo4j")
+    NEO4J_PASSWORD = _get("NEO4J_PASSWORD", "neo4jpass")
+
+    LANGFUSE_PUBLIC_KEY = _get("LANGFUSE_PUBLIC_KEY", "")
+    LANGFUSE_SECRET_KEY = _get("LANGFUSE_SECRET_KEY", "")
+    LANGFUSE_HOST = _get("LANGFUSE_HOST", "http://localhost:3000")
+
 
 settings = Settings()

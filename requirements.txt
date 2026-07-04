@@ -34,3 +34,8 @@ pymongo==4.9.1
 # === Phase 8: Local LLM (Ollama) + Qdrant RAG ===
 openai==1.51.0
 qdrant-client==1.11.3
+
+# === Phase 10: Neo4j graph store + Langfuse observability + testing ===
+neo4j==5.24.0
+langfuse==2.51.3
+pytest==8.3.3

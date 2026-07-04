@@ -32,6 +32,7 @@ from db.database import get_db, init_db
 from db.models import Applicant, Application, Document, ApplicationStatus
 from db.mongo_store import mongo_store
 from db.vector_store import vector_store
+from db.graph_store import graph_store
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("api")
@@ -61,7 +62,8 @@ def startup():
 @app.get("/health")
 def health():
     return {"status": "ok", "langgraph": LANGGRAPH_AVAILABLE,
-             "storage": "PostgreSQL/SQLite + MongoDB (Phase 7)", "llm": "Ollama (Phase 8)"}
+             "storage": "PostgreSQL/SQLite + MongoDB (Phase 7)", "llm": "Ollama (Phase 8)",
+             "graph": "Neo4j (Phase 10)", "version": "1.0.0"}
 
 
 @app.post("/chat", response_model=ChatMessageOut)
@@ -156,6 +158,14 @@ async def submit_application(
         db.add(Document(application_id=application_id, doc_type=doc_type,
                          file_name=upload.filename, mongo_ref=mongo_ref))
     db.commit()
+
+    shared_address_applicants = []
+    if address:
+        graph_store.link_applicant_to_household(applicant.id, address, family_size)
+        shared_address_applicants = graph_store.find_shared_address_applicants(address, applicant.id)
+        if shared_address_applicants:
+            logger.info("Address '%s' is shared with %d other applicant(s): %s",
+                        address, len(shared_address_applicants), shared_address_applicants)
 
     state = {
         "application_id": application_id,
