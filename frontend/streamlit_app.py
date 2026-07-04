@@ -32,13 +32,17 @@ with tab_apply:
     st.markdown("**Supporting documents**")
     d1, d2, d3 = st.columns(3)
     with d1:
-        bank_statement = st.file_uploader("Bank statement (.txt)", type=["txt"])
-        emirates_id_doc = st.file_uploader("Emirates ID (.json)", type=["json"])
+        bank_statement = st.file_uploader("Bank statement (.pdf/.doc/.docx/.txt)",
+                                            type=["pdf", "doc", "docx", "txt"])
+        emirates_id_doc = st.file_uploader("Emirates ID (.pdf/.doc/.docx/.json)",
+                                             type=["pdf", "doc", "docx", "json"])
     with d2:
-        resume = st.file_uploader("Resume (.txt)", type=["txt"])
+        resume = st.file_uploader("Resume (.pdf/.doc/.docx/.txt)",
+                                    type=["pdf", "doc", "docx", "txt"])
         assets_liabilities = st.file_uploader("Assets/liabilities (.xlsx)", type=["xlsx"])
     with d3:
-        credit_report = st.file_uploader("Credit report (.txt)", type=["txt"])
+        credit_report = st.file_uploader("Credit report (.pdf/.doc/.docx/.txt)",
+                                           type=["pdf", "doc", "docx", "txt"])
 
     if st.button("Submit application", type="primary"):
         if not full_name or not emirates_id:

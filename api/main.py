@@ -34,6 +34,8 @@ from db.mongo_store import mongo_store
 from db.vector_store import vector_store
 from db.graph_store import graph_store
 
+from agents.document_readers import extract_text
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("api")
 
@@ -94,11 +96,28 @@ def chat(payload: ChatMessageIn, db: Session = Depends(get_db)):
 def _read_upload(upload: UploadFile):
     suffix = os.path.splitext(upload.filename)[1].lower()
     content = upload.file.read()
+
     if suffix in (".xlsx", ".xls"):
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
         tmp.write(content)
         tmp.close()
         return tmp.name
+
+    if suffix in (".pdf", ".doc", ".docx"):
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+        tmp.write(content)
+        tmp.close()
+        try:
+            text = extract_text(tmp.name, suffix)
+            if not text:
+                logger.warning("No text could be extracted from %s (%s)", upload.filename, suffix)
+            return text
+        except Exception as e:  # noqa: BLE001
+            logger.error("Failed to extract text from %s (%s): %s", upload.filename, suffix, e)
+            return ""
+        finally:
+            os.unlink(tmp.name)
+
     if suffix == ".json":
         try:
             return json.loads(content.decode("utf-8"))

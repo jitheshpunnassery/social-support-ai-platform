@@ -33,6 +33,7 @@ in minutes, plus personalized upskilling/job-matching recommendations.
 | Vector DB | Qdrant (in-memory fallback) | Phase 8 |
 | Graph DB | Neo4j (in-memory fallback) | Phase 10 |
 | Observability | Langfuse (optional) + local audit trail | Phase 7 (DB trail), Phase 10 (Langfuse) |
+| Document formats | PDF, DOC/DOCX, TXT, JSON (Excel for assets/liabilities) | Phase 2 (TXT/JSON), Phase 11 (PDF/DOC/DOCX) |
 
 **Every external service has a graceful in-process fallback**, so the
 whole pipeline runs standalone with zero infrastructure for demoing or

@@ -92,13 +92,30 @@ class DataExtractionAgent(BaseAgent):
             try:
                 fields = json.loads(content)
             except Exception:  # noqa: BLE001
-                fields = {}
+                # Not JSON -> likely plain text extracted from a PDF/DOCX
+                # scan of the physical ID card. Fall back to regex parsing
+                # of common Emirates ID field labels.
+                return self._extract_emirates_id_from_text(content or "")
         return {
             "id_number": fields.get("id_number"),
             "name_en": fields.get("name_en"),
             "nationality": fields.get("nationality"),
             "date_of_birth": fields.get("date_of_birth"),
             "expiry_date": fields.get("expiry_date"),
+        }
+
+    def _extract_emirates_id_from_text(self, text: str) -> dict:
+        id_number = re.findall(r"(\d{3}-\d{4}-\d{7}-\d)", text)
+        name = re.findall(r"Name(?:\s*\(EN\))?:\s*(.+)", text, re.IGNORECASE)
+        nationality = re.findall(r"Nationality:\s*(.+)", text, re.IGNORECASE)
+        dob = re.findall(r"Date of Birth:\s*([\d/\-]+)", text, re.IGNORECASE)
+        expiry = re.findall(r"Expiry Date:\s*([\d/\-]+)", text, re.IGNORECASE)
+        return {
+            "id_number": id_number[0] if id_number else None,
+            "name_en": name[0].strip() if name else None,
+            "nationality": nationality[0].strip() if nationality else None,
+            "date_of_birth": dob[0].strip() if dob else None,
+            "expiry_date": expiry[0].strip() if expiry else None,
         }
 
     def _extract_resume(self, text: str) -> dict:
