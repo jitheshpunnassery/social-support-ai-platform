@@ -15,6 +15,7 @@ unreachable.
 import difflib
 
 from agents.base import BaseAgent
+from agents.llm_client import llm_client
 
 
 class DataValidationAgent(BaseAgent):
@@ -39,7 +40,16 @@ class DataValidationAgent(BaseAgent):
             severity = "medium"
 
         report = {"flags": flags, "overall_severity": severity, "requires_human_review": severity == "high"}
-        report["summary"] = self._template_summary(flags)
+
+        if flags:
+            llm_summary = llm_client.chat(
+                "You are a compliance assistant. Summarize data-consistency findings for a case "
+                "officer in 2-3 plain sentences, non-accusatory tone.",
+                f"Findings: {flags}",
+            )
+            report["summary"] = llm_summary or self._template_summary(flags)
+        else:
+            report["summary"] = self._template_summary(flags)
 
         state["validation_report"] = report
         self.think(state, f"Validation complete. Overall severity: {severity}. "

@@ -13,7 +13,7 @@ st.title("🤝 Social Support & Economic Enablement — AI Assistant")
 st.caption("Prototype: multi-agent GenAI workflow for social support application intake, "
            "validation, eligibility assessment, and decisioning.")
 
-tab_apply, tab_status = st.tabs(["📝 New Application", "📋 Check Status"])
+tab_apply, tab_status, tab_chat = st.tabs(["📝 New Application", "📋 Check Status", "💬 Chat with the Assistant"])
 
 with tab_apply:
     st.subheader("Submit a new application")
@@ -96,3 +96,33 @@ with tab_status:
                 st.error("Application not found.")
         except Exception as e:  # noqa: BLE001
             st.error(f"Lookup failed: {e}")
+
+with tab_chat:
+    st.subheader("Ask the assistant")
+    st.caption("Ask about eligibility criteria, required documents, or the status of a specific "
+               "application (paste the Application ID for personalized context). Powered by a "
+               "locally hosted LLM via Ollama.")
+
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+
+    chat_app_id = st.text_input("Application ID (optional, for status-aware answers)", key="chat_app_id")
+
+    for role, msg in st.session_state.chat_history:
+        with st.chat_message(role):
+            st.write(msg)
+
+    user_msg = st.chat_input("Type your question...")
+    if user_msg:
+        st.session_state.chat_history.append(("user", user_msg))
+        with st.chat_message("user"):
+            st.write(user_msg)
+        try:
+            resp = requests.post(f"{API}/chat", json={"application_id": chat_app_id or None, "message": user_msg},
+                                  timeout=60)
+            reply = resp.json().get("reply", "Sorry, I couldn't process that.")
+        except Exception as e:  # noqa: BLE001
+            reply = f"Chat service unavailable: {e}"
+        st.session_state.chat_history.append(("assistant", reply))
+        with st.chat_message("assistant"):
+            st.write(reply)

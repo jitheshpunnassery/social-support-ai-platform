@@ -42,5 +42,15 @@ class Settings:
     MONGO_URI = _get("MONGO_URI", "mongodb://localhost:27017")
     MONGO_DB = _get("MONGO_DB", "social_support_docs")
 
+    # --- Phase 8: local LLM (Ollama, OpenAI-compatible) + Qdrant RAG ---
+    OLLAMA_BASE_URL = _get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+    OLLAMA_API_KEY = _get("OLLAMA_API_KEY", "ollama")
+    OLLAMA_MODEL = _get("OLLAMA_MODEL", "llama3.1:8b-instruct-q4_K_M")
+    OLLAMA_VISION_MODEL = _get("OLLAMA_VISION_MODEL", "llava:13b")
+
+    QDRANT_HOST = _get("QDRANT_HOST", "localhost")
+    QDRANT_PORT = int(_get("QDRANT_PORT", "6333"))
+    QDRANT_COLLECTION = _get("QDRANT_COLLECTION", "policy_precedents")
+
 
 settings = Settings()

@@ -26,27 +26,67 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from agents.orchestrator import run_application, LANGGRAPH_AVAILABLE
-from api.schemas import ApplicationResult
+from agents.llm_client import llm_client
+from api.schemas import ApplicationResult, ChatMessageIn, ChatMessageOut
 from db.database import get_db, init_db
 from db.models import Applicant, Application, Document, ApplicationStatus
 from db.mongo_store import mongo_store
+from db.vector_store import vector_store
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("api")
 
-app = FastAPI(title="Social Support AI Workflow", version="0.7.0")
+app = FastAPI(title="Social Support AI Workflow", version="0.8.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+# Phase 8: seed a couple of policy snippets into the vector store on startup
+# so the /chat endpoint has something grounded to retrieve (RAG demo).
+POLICY_SNIPPETS = [
+    ("policy_income_threshold", "Applicants with household per-capita monthly income below AED 1500 "
+                                  "are generally eligible for direct financial support."),
+    ("policy_review", "Any application with unresolved document inconsistencies (e.g. mismatched "
+                        "name or expired Emirates ID) is routed to a human case officer before a "
+                        "final decision is issued."),
+]
 
 
 @app.on_event("startup")
 def startup():
     init_db()
+    for pid, text in POLICY_SNIPPETS:
+        vector_store.upsert(pid, text, {"text": text})
     logger.info("Startup complete. LangGraph available: %s", LANGGRAPH_AVAILABLE)
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "langgraph": LANGGRAPH_AVAILABLE, "storage": "PostgreSQL/SQLite + MongoDB (Phase 7)"}
+    return {"status": "ok", "langgraph": LANGGRAPH_AVAILABLE,
+             "storage": "PostgreSQL/SQLite + MongoDB (Phase 7)", "llm": "Ollama (Phase 8)"}
+
+
+@app.post("/chat", response_model=ChatMessageOut)
+def chat(payload: ChatMessageIn, db: Session = Depends(get_db)):
+    """Interactive chatbot endpoint. Retrieves relevant policy snippets (RAG
+    via Qdrant) and, if an application_id is supplied, its current status,
+    then asks the local LLM to respond grounded in that context."""
+    context_chunks = vector_store.search(payload.message, top_k=2)
+    policy_context = "\n".join(c["payload"].get("text", "") for c in context_chunks)
+
+    app_context = ""
+    if payload.application_id:
+        application = db.query(Application).filter_by(id=payload.application_id).first()
+        if application:
+            app_context = (f"Application status: {application.status.value}. "
+                            f"Decision: {application.decision}. Reason: {application.decision_reason}.")
+
+    reply = llm_client.chat(
+        "You are a helpful, empathetic assistant for a government social support department. "
+        "Answer using the provided policy context and application context when relevant. "
+        "Be concise and clear.",
+        f"Policy context:\n{policy_context}\n\nApplication context:\n{app_context}\n\n"
+        f"Applicant question: {payload.message}",
+    )
+    return ChatMessageOut(reply=reply)
 
 
 def _read_upload(upload: UploadFile):

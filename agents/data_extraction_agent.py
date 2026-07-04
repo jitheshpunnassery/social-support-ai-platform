@@ -24,6 +24,13 @@ import re
 import pandas as pd
 
 from agents.base import BaseAgent
+from agents.llm_client import llm_client
+
+EXTRACTION_SYSTEM_PROMPT = (
+    "You are a document data-extraction assistant for a government social "
+    "support office. Extract only the fields requested, as strict JSON. "
+    "If a field is missing, use null. Never invent values."
+)
 
 
 class DataExtractionAgent(BaseAgent):
@@ -48,7 +55,7 @@ class DataExtractionAgent(BaseAgent):
 
         if "resume" in docs:
             extracted["resume"] = self.act(
-                state, "extract resume fields (regex)",
+                state, "extract resume fields (LLM, regex fallback)",
                 lambda: self._extract_resume(docs["resume"]))
 
         if "assets_liabilities" in docs:
@@ -95,9 +102,24 @@ class DataExtractionAgent(BaseAgent):
         }
 
     def _extract_resume(self, text: str) -> dict:
-        """Regex-based extraction. Phase 8 adds an LLM-based path for
-        messier real-world resumes; this deterministic parser remains the
-        offline fallback when the local LLM is unreachable."""
+        """Phase 8: tries the local LLM (Ollama) first for more robust
+        free-text understanding of messier real-world resumes. Falls back
+        to the deterministic Phase 2 regex parser when the LLM is
+        unreachable or returns unparseable output."""
+        raw = llm_client.chat(
+            EXTRACTION_SYSTEM_PROMPT,
+            f"Extract from this resume as JSON with keys "
+            f"years_experience (int), skills (list of strings), education_level (string):\n\n{text}",
+            json_mode=True,
+        )
+        try:
+            parsed = json.loads(raw)
+            if "years_experience" in parsed or "skills" in parsed:
+                return parsed
+        except Exception:  # noqa: BLE001
+            pass
+
+        # Deterministic fallback (identical to Phase 2 logic)
         skills = re.findall(r"Skills:\s*(.+)", text)
         years = re.findall(r"(\d+)\s+years", text)
         education = re.findall(r"Education:\s*(.+)", text)
