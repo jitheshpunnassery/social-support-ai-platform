@@ -12,3 +12,7 @@ openpyxl==3.1.5
 # === Phase 4: ML eligibility model ===
 scikit-learn==1.5.2
 joblib==1.4.2
+
+# === Phase 5: LangGraph agent orchestration ===
+langgraph==0.2.34
+langchain-core==0.3.9
