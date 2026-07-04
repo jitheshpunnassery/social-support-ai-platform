@@ -4,10 +4,11 @@ Master Orchestrator
 Coordinates the specialist agents into the end-to-end application workflow:
 
   intake -> data_extraction -> data_validation -> eligibility_assessment
-         -> decision -> finalize
+         -> decision -> enablement_recommendation -> finalize
 
-(The `enablement_recommendation` node is added after `decision` in Phase 9;
-this phase ends at `decision` -> `finalize`.)
+(Phase 9 adds the `enablement_recommendation` node after `decision`; it
+runs for every applicant, not only declines, to surface upskilling/job-
+matching support alongside the financial-support decision.)
 
 Orchestration tool: LangGraph (StateGraph) defines this as an explicit,
 inspectable graph. If LangGraph isn't installed, a functionally equivalent
@@ -24,6 +25,7 @@ from agents.data_extraction_agent import DataExtractionAgent
 from agents.data_validation_agent import DataValidationAgent
 from agents.eligibility_agent import EligibilityAgent
 from agents.decision_agent import DecisionAgent
+from agents.enablement_agent import EnablementAgent
 from observability.tracing import trace_step
 
 logger = logging.getLogger(__name__)
@@ -39,6 +41,7 @@ _extraction = DataExtractionAgent()
 _validation = DataValidationAgent()
 _eligibility = EligibilityAgent()
 _decision = DecisionAgent()
+_enablement = EnablementAgent()
 
 
 def _node_intake(state: dict) -> dict:
@@ -63,6 +66,7 @@ def build_graph():
     graph.add_node("data_validation", _validation.run)
     graph.add_node("eligibility_assessment", _eligibility.run)
     graph.add_node("decision", _decision.run)
+    graph.add_node("enablement_recommendation", _enablement.run)
     graph.add_node("finalize", _node_finalize)
 
     graph.set_entry_point("intake")
@@ -70,7 +74,8 @@ def build_graph():
     graph.add_edge("data_extraction", "data_validation")
     graph.add_edge("data_validation", "eligibility_assessment")
     graph.add_edge("eligibility_assessment", "decision")
-    graph.add_edge("decision", "finalize")
+    graph.add_edge("decision", "enablement_recommendation")
+    graph.add_edge("enablement_recommendation", "finalize")
     graph.add_edge("finalize", END)
 
     return graph.compile()
@@ -84,6 +89,7 @@ _SEQUENTIAL_STEPS = [
     ("data_validation", _validation.run),
     ("eligibility_assessment", _eligibility.run),
     ("decision", _decision.run),
+    ("enablement_recommendation", _enablement.run),
     ("finalize", _node_finalize),
 ]
 

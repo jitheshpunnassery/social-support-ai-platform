@@ -75,6 +75,13 @@ with tab_apply:
                     st.progress(min(1.0, result["ml_score"]), text=f"Eligibility score: {result['ml_score']:.2f}")
                 st.write(result.get("decision_reason", ""))
 
+                if result.get("enablement_recommendations"):
+                    st.markdown("**Recommended enablement programmes:**")
+                    for rec in result["enablement_recommendations"]:
+                        st.write(f"- {rec['name']} (matched on: {', '.join(rec['matched_on'])})")
+                    if result.get("enablement_narrative"):
+                        st.info(result["enablement_narrative"])
+
                 if result.get("validation_report", {}).get("flags"):
                     with st.expander("⚠️ Data consistency flags"):
                         for flag in result["validation_report"]["flags"]:

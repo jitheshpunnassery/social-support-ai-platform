@@ -181,6 +181,7 @@ async def submit_application(
     application.ml_score = result_state.get("ml_score")
     application.decision = result_state.get("decision")
     application.decision_reason = result_state.get("decision_reason")
+    application.enablement_recommendations = result_state.get("enablement_recommendations")  # Phase 9
     application.processing_seconds = processing_seconds
     db.commit()
 
@@ -192,6 +193,8 @@ async def submit_application(
         ml_score=result_state.get("ml_score"),
         top_factors=result_state.get("top_factors"),
         validation_report=result_state.get("validation_report"),
+        enablement_recommendations=result_state.get("enablement_recommendations"),
+        enablement_narrative=result_state.get("enablement_narrative"),
         processing_seconds=processing_seconds,
         trace=result_state.get("trace"),
     )
@@ -209,5 +212,6 @@ def get_application(application_id: str, db: Session = Depends(get_db)):
         decision_reason=application.decision_reason,
         ml_score=application.ml_score,
         validation_report=application.validation_report,
+        enablement_recommendations=application.enablement_recommendations,
         processing_seconds=application.processing_seconds,
     )

@@ -19,5 +19,7 @@ class ApplicationResult(BaseModel):
     ml_score: Optional[float] = None
     top_factors: Optional[list] = None
     validation_report: Optional[dict] = None
+    enablement_recommendations: Optional[list] = None  # Phase 9
+    enablement_narrative: Optional[str] = None           # Phase 9
     processing_seconds: Optional[float] = None
     trace: Optional[list] = None
