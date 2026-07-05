@@ -133,7 +133,15 @@ def _read_upload(upload: UploadFile):
 async def submit_application(
     full_name: str = Form(...),
     emirates_id: str = Form(...),
-    address: str = Form(None),
+    date_of_birth: str = Form(...),
+    gender: str = Form(...),
+    nationality: str = Form(...),
+    marital_status: str = Form(...),
+    mobile_number: str = Form(...),
+    email: str = Form(...),
+    address: str = Form(...),
+    emirate: str = Form(...),
+    residency_status: str = Form(...),
     family_size: int = Form(1),
     employment_status: str = Form("unemployed"),
     monthly_income: float = Form(0.0),
@@ -150,7 +158,10 @@ async def submit_application(
     applicant = db.query(Applicant).filter_by(emirates_id=emirates_id).first()
     if not applicant:
         applicant = Applicant(
-            emirates_id=emirates_id, full_name=full_name, address=address,
+            emirates_id=emirates_id, full_name=full_name, date_of_birth=date_of_birth,
+            gender=gender, nationality=nationality, marital_status=marital_status,
+            mobile_number=mobile_number, email=email, address=address, emirate=emirate,
+            residency_status=residency_status,
             family_size=family_size, employment_status=employment_status,
             monthly_income=monthly_income,
         )
@@ -189,9 +200,12 @@ async def submit_application(
     state = {
         "application_id": application_id,
         "form_data": {
-            "full_name": full_name, "address": address, "family_size": family_size,
-            "employment_status": employment_status, "monthly_income": monthly_income,
-            "months_employed": months_employed,
+            "full_name": full_name, "date_of_birth": date_of_birth, "gender": gender,
+            "nationality": nationality, "marital_status": marital_status,
+            "mobile_number": mobile_number, "email": email, "address": address,
+            "emirate": emirate, "residency_status": residency_status,
+            "family_size": family_size, "employment_status": employment_status,
+            "monthly_income": monthly_income, "months_employed": months_employed,
         },
         "raw_documents": raw_documents,
         "db_session": db,

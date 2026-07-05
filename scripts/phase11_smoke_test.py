@@ -32,6 +32,10 @@ with TestClient(app) as client:
         resp = client.post(
             "/applications",
             data={"full_name": "PDF Docx Applicant", "emirates_id": "784-1990-1234567-1",
+                  "date_of_birth": "1988-03-10", "gender": "Female", "nationality": "UAE",
+                  "marital_status": "Married", "mobile_number": "+971509876543",
+                  "email": "pdf.docx.applicant@example.com", "emirate": "Abu Dhabi",
+                  "residency_status": "UAE National",
                   "family_size": 4, "employment_status": "unemployed", "monthly_income": 1000,
                   "address": "123 Sheikh Zayed Road, Dubai"},
             files={

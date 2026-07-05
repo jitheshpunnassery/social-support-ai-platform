@@ -15,19 +15,41 @@ st.caption("Prototype: multi-agent GenAI workflow for social support application
 
 tab_apply, tab_status, tab_chat = st.tabs(["📝 New Application", "📋 Check Status", "💬 Chat with the Assistant"])
 
+GENDER_OPTIONS = ["Select...", "Male", "Female"]
+MARITAL_STATUS_OPTIONS = ["Select...", "Single", "Married", "Divorced", "Widowed"]
+EMIRATE_OPTIONS = ["Select...", "Abu Dhabi", "Dubai", "Sharjah", "Ajman",
+                    "Umm Al Quwain", "Ras Al Khaimah", "Fujairah"]
+RESIDENCY_STATUS_OPTIONS = ["Select...", "UAE National", "GCC National",
+                              "Resident Expatriate", "Visit Visa", "Other"]
+
 with tab_apply:
     st.subheader("Submit a new application")
+    st.caption("All personal information fields below are required.")
 
     with st.form("application_form", clear_on_submit=False):
+        st.markdown("**Personal Information**")
         col1, col2 = st.columns(2)
         with col1:
-            full_name = st.text_input("Full name")
-            emirates_id = st.text_input("Emirates ID number", placeholder="784-YYYY-XXXXXXX-X")
-            address = st.text_input("Current address")
+            full_name = st.text_input("Full Name *")
+            emirates_id = st.text_input("Emirates ID Number *", placeholder="784-YYYY-XXXXXXX-X")
+            date_of_birth = st.date_input("Date of Birth *", value=None, min_value=None)
+            gender = st.selectbox("Gender *", GENDER_OPTIONS)
+            nationality = st.text_input("Nationality *")
+            marital_status = st.selectbox("Marital Status *", MARITAL_STATUS_OPTIONS)
         with col2:
+            mobile_number = st.text_input("Mobile Number *", placeholder="+971 5X XXX XXXX")
+            email = st.text_input("Email Address *", placeholder="name@example.com")
+            address = st.text_input("Current Residential Address *")
+            emirate = st.selectbox("Emirate *", EMIRATE_OPTIONS)
+            residency_status = st.selectbox("Residency Status *", RESIDENCY_STATUS_OPTIONS)
+
+        st.markdown("**Household & Employment**")
+        col3, col4 = st.columns(2)
+        with col3:
             family_size = st.number_input("Family size", min_value=1, max_value=20, value=1)
             employment_status = st.selectbox("Employment status",
                                               ["unemployed", "part_time", "full_time", "self_employed", "retired"])
+        with col4:
             monthly_income = st.number_input("Monthly income (AED)", min_value=0.0, value=0.0, step=100.0)
             months_employed = st.number_input("Months in current employment", min_value=0, value=0)
 
@@ -51,8 +73,39 @@ with tab_apply:
     if submitted:
         full_name = (full_name or "").strip()
         emirates_id = (emirates_id or "").strip()
-        if not full_name or not emirates_id:
-            st.error("Full name and Emirates ID are required.")
+        nationality = (nationality or "").strip()
+        mobile_number = (mobile_number or "").strip()
+        email = (email or "").strip()
+        address = (address or "").strip()
+
+        missing = []
+        if not full_name:
+            missing.append("Full Name")
+        if not emirates_id:
+            missing.append("Emirates ID Number")
+        if not date_of_birth:
+            missing.append("Date of Birth")
+        if gender == "Select...":
+            missing.append("Gender")
+        if not nationality:
+            missing.append("Nationality")
+        if marital_status == "Select...":
+            missing.append("Marital Status")
+        if not mobile_number:
+            missing.append("Mobile Number")
+        if not email:
+            missing.append("Email Address")
+        if not address:
+            missing.append("Current Residential Address")
+        if emirate == "Select...":
+            missing.append("Emirate")
+        if residency_status == "Select...":
+            missing.append("Residency Status")
+
+        if missing:
+            st.error("Please complete the following required field(s): " + ", ".join(missing))
+        elif "@" not in email or "." not in email.split("@")[-1]:
+            st.error("Please enter a valid email address.")
         else:
             files = {}
             for key, f in [("bank_statement", bank_statement), ("emirates_id_doc", emirates_id_doc),
@@ -62,13 +115,18 @@ with tab_apply:
                     files[key] = (f.name, f.getvalue())
 
             data = {
-                "full_name": full_name, "emirates_id": emirates_id, "address": address,
+                "full_name": full_name, "emirates_id": emirates_id,
+                "date_of_birth": str(date_of_birth), "gender": gender,
+                "nationality": nationality, "marital_status": marital_status,
+                "mobile_number": mobile_number, "email": email, "address": address,
+                "emirate": emirate, "residency_status": residency_status,
                 "family_size": family_size, "employment_status": employment_status,
                 "monthly_income": monthly_income, "months_employed": months_employed,
             }
             with st.spinner("Our AI agents are reviewing your application..."):
                 try:
-                    resp = requests.post(f"{API}/applications", data=data, files=files, timeout=120)
+                    resp = requests.post(f"{API}/applications", data=data, files=files,
+                                          timeout=settings.REQUEST_TIMEOUT_SECONDS)
                     resp.raise_for_status()
                     result = resp.json()
                 except Exception as e:  # noqa: BLE001
@@ -143,7 +201,7 @@ with tab_chat:
             st.write(user_msg)
         try:
             resp = requests.post(f"{API}/chat", json={"application_id": chat_app_id or None, "message": user_msg},
-                                  timeout=60)
+                                  timeout=settings.REQUEST_TIMEOUT_SECONDS)
             reply = resp.json().get("reply", "Sorry, I couldn't process that.")
         except Exception as e:  # noqa: BLE001
             reply = f"Chat service unavailable: {e}"

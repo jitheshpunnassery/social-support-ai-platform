@@ -1,13 +1,19 @@
 """
 Thin wrapper around a locally hosted LLM (Ollama, served through its
 OpenAI-compatible /v1 endpoint). Falls back to a deterministic rule-based
-responder when no local model server is reachable, so the rest of the
-pipeline (orchestration, DB writes, UI) is fully demoable offline/in CI.
+responder when no local model server is reachable -- OR when it's
+reachable but too slow to answer within OLLAMA_TIMEOUT_SECONDS (a cold
+model load or CPU-bound generation can otherwise hang far longer than a
+caller is willing to wait, since the openai SDK's default timeout is
+several minutes). Bounding each call keeps total request latency
+predictable even when several LLM calls happen in one pipeline run
+(resume parsing, validation summary, decision explanation, enablement
+narrative can all fire in a single /applications submission).
 """
 import json
 import logging
 
-from openai import OpenAI, APIConnectionError
+from openai import OpenAI, APIConnectionError, APITimeoutError
 
 from config import settings
 
@@ -16,7 +22,12 @@ logger = logging.getLogger(__name__)
 
 class LocalLLMClient:
     def __init__(self):
-        self._client = OpenAI(base_url=settings.OLLAMA_BASE_URL, api_key=settings.OLLAMA_API_KEY)
+        self._client = OpenAI(
+            base_url=settings.OLLAMA_BASE_URL,
+            api_key=settings.OLLAMA_API_KEY,
+            timeout=settings.OLLAMA_TIMEOUT_SECONDS,
+            max_retries=0,  # fail fast -> fallback, rather than the SDK's default retry/backoff
+        )
         self._available = None  # lazily probed
 
     def _probe(self) -> bool:
@@ -39,8 +50,14 @@ class LocalLLMClient:
                     messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
                     temperature=0.1,
                     response_format={"type": "json_object"} if json_mode else None,
+                    timeout=settings.OLLAMA_TIMEOUT_SECONDS,
                 )
                 return resp.choices[0].message.content
+            except APITimeoutError:
+                logger.warning("LLM call exceeded OLLAMA_TIMEOUT_SECONDS=%s; using fallback. "
+                                "If Ollama is just slow (cold model load / CPU inference), raise "
+                                "OLLAMA_TIMEOUT_SECONDS in .env rather than the client-side request timeout.",
+                                settings.OLLAMA_TIMEOUT_SECONDS)
             except (APIConnectionError, Exception) as e:  # noqa: BLE001
                 logger.warning("LLM call failed (%s); using fallback.", e)
         return self._fallback(system, user, json_mode)

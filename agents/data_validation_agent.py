@@ -2,13 +2,16 @@
 Data Validation Agent
 ----------------------
 Cross-checks extracted fields across documents and against the applicant's
-self-reported form data to surface the "Inconsistent Information" pain
-point automatically: address mismatches (form vs credit bureau), income
-variance across documents, family member/name mismatches, expired IDs, etc.
+self-reported form data to surface inconsistencies automatically: address
+mismatches (form vs credit bureau), income variance across documents,
+name/date-of-birth/nationality mismatches (form vs Emirates ID), expired
+IDs, etc.
 
 Uses a ReAct loop: for each consistency rule, THOUGHT -> ACTION (comparison)
--> OBSERVATION (flag or pass), then asks the local LLM to summarize findings
-in plain language for the case officer / applicant-facing chat.
+-> OBSERVATION (flag or pass). The plain-language summary in this phase is
+template-based; Phase 8 upgrades it to use the local LLM for a more natural
+case-officer-facing summary, falling back to this template when the LLM is
+unreachable.
 """
 import difflib
 
@@ -27,6 +30,8 @@ class DataValidationAgent(BaseAgent):
         flags = []
 
         flags += self.act(state, "check name consistency", lambda: self._check_name(form, extracted))
+        flags += self.act(state, "check date of birth consistency", lambda: self._check_date_of_birth(form, extracted))
+        flags += self.act(state, "check nationality consistency", lambda: self._check_nationality(form, extracted))
         flags += self.act(state, "check address consistency", lambda: self._check_address(form, extracted))
         flags += self.act(state, "check income consistency", lambda: self._check_income(form, extracted))
         flags += self.act(state, "check ID validity", lambda: self._check_id_validity(extracted))
@@ -40,19 +45,26 @@ class DataValidationAgent(BaseAgent):
         report = {"flags": flags, "overall_severity": severity, "requires_human_review": severity == "high"}
 
         if flags:
-            summary = llm_client.chat(
+            llm_summary = llm_client.chat(
                 "You are a compliance assistant. Summarize data-consistency findings for a case "
                 "officer in 2-3 plain sentences, non-accusatory tone.",
                 f"Findings: {flags}",
             )
-            report["summary"] = summary
+            report["summary"] = llm_summary or self._template_summary(flags)
         else:
-            report["summary"] = "No material inconsistencies found across submitted documents."
+            report["summary"] = self._template_summary(flags)
 
         state["validation_report"] = report
         self.think(state, f"Validation complete. Overall severity: {severity}. "
                            f"{len(flags)} flag(s) raised.")
         return state
+
+    @staticmethod
+    def _template_summary(flags: list) -> str:
+        if not flags:
+            return "No material inconsistencies found across submitted documents."
+        fields = ", ".join(f["field"] for f in flags)
+        return f"{len(flags)} consistency flag(s) raised on: {fields}. See details for specifics."
 
     def _check_name(self, form, extracted) -> list:
         flags = []
@@ -64,6 +76,26 @@ class DataValidationAgent(BaseAgent):
                 flags.append({"field": "full_name", "severity": "high",
                                "detail": f"Form name '{form.get('full_name')}' doesn't match "
                                          f"Emirates ID name on record."})
+        return flags
+
+    def _check_date_of_birth(self, form, extracted) -> list:
+        flags = []
+        form_dob = (form.get("date_of_birth") or "").strip()
+        id_dob = ((extracted.get("emirates_id") or {}).get("date_of_birth") or "").strip()
+        if form_dob and id_dob and form_dob != id_dob:
+            flags.append({"field": "date_of_birth", "severity": "high",
+                           "detail": f"Form date of birth ({form_dob}) doesn't match the date of "
+                                     f"birth on the Emirates ID record ({id_dob})."})
+        return flags
+
+    def _check_nationality(self, form, extracted) -> list:
+        flags = []
+        form_nat = (form.get("nationality") or "").strip().lower()
+        id_nat = ((extracted.get("emirates_id") or {}).get("nationality") or "").strip().lower()
+        if form_nat and id_nat and form_nat != id_nat:
+            flags.append({"field": "nationality", "severity": "medium",
+                           "detail": f"Form nationality ('{form.get('nationality')}') differs from the "
+                                     f"nationality on the Emirates ID record ('{(extracted.get('emirates_id') or {}).get('nationality')}')."})
         return flags
 
     def _check_address(self, form, extracted) -> list:
