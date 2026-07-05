@@ -5,17 +5,18 @@ Ingests the interactive application form plus attachments (bank statement,
 Emirates ID, resume, assets/liabilities Excel, credit report) and produces
 normalized structured fields.
 
-Data-type-specific tooling (justified in the solution summary doc):
+Data-type-specific tooling:
   - PDFs / text documents  -> pdfplumber for text-layer PDFs, pytesseract
                                OCR for scanned images (bank statement, ID).
   - Structured Excel        -> openpyxl/pandas (assets & liabilities workbook).
-  - Free text (resume, credit report) -> local LLM (Ollama) prompted to emit
-                               strict JSON, so unstructured narrative content
-                               is normalized the same way a case officer
-                               would read it, without brittle regex.
-  - Images (ID card, scanned forms) -> vision-capable local model
-                               (llava via Ollama) for key field OCR when a
-                               text layer isn't available.
+  - Free text (resume, credit report) -> regex-based parsing in this phase.
+                               NOTE: Phase 8 upgrades resume parsing to use a
+                               locally hosted LLM (Ollama) for more robust
+                               free-text understanding, with this regex logic
+                               kept as the offline fallback.
+  - Images (ID card, scanned forms) -> pytesseract OCR when no text layer
+                               is available (not exercised by the synthetic
+                               JSON fixtures used for testing in this phase).
 """
 import json
 import re
@@ -24,7 +25,6 @@ import pandas as pd
 
 from agents.base import BaseAgent
 from agents.llm_client import llm_client
-
 
 EXTRACTION_SYSTEM_PROMPT = (
     "You are a document data-extraction assistant for a government social "
@@ -55,7 +55,7 @@ class DataExtractionAgent(BaseAgent):
 
         if "resume" in docs:
             extracted["resume"] = self.act(
-                state, "extract resume fields (LLM)",
+                state, "extract resume fields (LLM, regex fallback)",
                 lambda: self._extract_resume(docs["resume"]))
 
         if "assets_liabilities" in docs:
@@ -86,13 +86,16 @@ class DataExtractionAgent(BaseAgent):
         }
 
     def _extract_emirates_id(self, content) -> dict:
-        if isinstance(content, (dict,)):
+        if isinstance(content, dict):
             fields = content
         else:
             try:
                 fields = json.loads(content)
             except Exception:  # noqa: BLE001
-                fields = {}
+                # Not JSON -> likely plain text extracted from a PDF/DOCX
+                # scan of the physical ID card. Fall back to regex parsing
+                # of common Emirates ID field labels.
+                return self._extract_emirates_id_from_text(content or "")
         return {
             "id_number": fields.get("id_number"),
             "name_en": fields.get("name_en"),
@@ -101,7 +104,25 @@ class DataExtractionAgent(BaseAgent):
             "expiry_date": fields.get("expiry_date"),
         }
 
+    def _extract_emirates_id_from_text(self, text: str) -> dict:
+        id_number = re.findall(r"(\d{3}-\d{4}-\d{7}-\d)", text)
+        name = re.findall(r"Name(?:\s*\(EN\))?:\s*(.+)", text, re.IGNORECASE)
+        nationality = re.findall(r"Nationality:\s*(.+)", text, re.IGNORECASE)
+        dob = re.findall(r"Date of Birth:\s*([\d/\-]+)", text, re.IGNORECASE)
+        expiry = re.findall(r"Expiry Date:\s*([\d/\-]+)", text, re.IGNORECASE)
+        return {
+            "id_number": id_number[0] if id_number else None,
+            "name_en": name[0].strip() if name else None,
+            "nationality": nationality[0].strip() if nationality else None,
+            "date_of_birth": dob[0].strip() if dob else None,
+            "expiry_date": expiry[0].strip() if expiry else None,
+        }
+
     def _extract_resume(self, text: str) -> dict:
+        """Phase 8: tries the local LLM (Ollama) first for more robust
+        free-text understanding of messier real-world resumes. Falls back
+        to the deterministic Phase 2 regex parser when the LLM is
+        unreachable or returns unparseable output."""
         raw = llm_client.chat(
             EXTRACTION_SYSTEM_PROMPT,
             f"Extract from this resume as JSON with keys "
@@ -109,17 +130,21 @@ class DataExtractionAgent(BaseAgent):
             json_mode=True,
         )
         try:
-            return json.loads(raw)
+            parsed = json.loads(raw)
+            if "years_experience" in parsed or "skills" in parsed:
+                return parsed
         except Exception:  # noqa: BLE001
-            # deterministic fallback parse
-            skills = re.findall(r"Skills:\s*(.+)", text)
-            years = re.findall(r"(\d+)\s+years", text)
-            education = re.findall(r"Education:\s*(.+)", text)
-            return {
-                "years_experience": int(years[0]) if years else None,
-                "skills": [s.strip() for s in skills[0].split(",")] if skills else [],
-                "education_level": education[0].strip() if education else None,
-            }
+            pass
+
+        # Deterministic fallback (identical to Phase 2 logic)
+        skills = re.findall(r"Skills:\s*(.+)", text)
+        years = re.findall(r"(\d+)\s+years", text)
+        education = re.findall(r"Education:\s*(.+)", text)
+        return {
+            "years_experience": int(years[0]) if years else None,
+            "skills": [s.strip() for s in skills[0].split(",")] if skills else [],
+            "education_level": education[0].strip() if education else None,
+        }
 
     def _extract_assets_liabilities(self, filepath: str) -> dict:
         assets_df = pd.read_excel(filepath, sheet_name="Assets")
